@@ -125,6 +125,7 @@ pub struct Config {
     frame_size: u8,
     managed_cs: bool,
     communication_mode: CommunicationMode,
+    t_size: u16,
 }
 
 impl Config {
@@ -140,6 +141,7 @@ impl Config {
             frame_size: 8_u8,
             managed_cs: false,
             communication_mode: CommunicationMode::FullDuplex,
+            t_size: 0u16,
         }
     }
 
@@ -184,6 +186,11 @@ impl Config {
 
     pub fn communication_mode(mut self, comms: CommunicationMode) -> Self {
         self.communication_mode = comms;
+        self
+    }
+
+    pub fn transfer_size(mut self, size: u16) -> Self {
+        self.t_size = size;
         self
     }
 }
@@ -342,6 +349,9 @@ pub enum Event {
     Txp,
     /// An error occurred
     Error,
+
+    /// A transfer has completed.
+    Eot,
 }
 
 #[derive(Debug)]
@@ -420,7 +430,7 @@ macro_rules! spi {
                     });
 
                     // Each transaction is 1 word in size.
-                    spi.cr2.write(|w| w.tsize().bits(1));
+                    spi.cr2.write(|w| w.tsize().bits(config.t_size));
 
                     // ssi: select slave = master mode
                     spi.cr1.write(|w| w.ssi().slave_not_selected());
@@ -495,6 +505,7 @@ macro_rules! spi {
                                 .modfie() // Mode fault
                                 .not_masked()
                         }),
+                        Event::Eot => self.spi.ier.modify(|_, w| w.eotie().not_masked()),
                     }
                 }
 
@@ -518,6 +529,7 @@ macro_rules! spi {
                                 .modfie() // Mode fault
                                 .masked()
                         }),
+                        Event::Eot => self.spi.ier.modify(|_, w| w.eotie().masked()),
                     }
                 }
 

@@ -106,7 +106,7 @@ pub trait TimerExt<TIM> {
 /// Hardware timers
 pub struct Timer<TIM> {
     clk: u32,
-    tim: TIM,
+    pub tim: TIM,
     timeout: Hertz,
 }
 
@@ -118,10 +118,10 @@ pub enum Event {
     TimeOut,
 
     /// Compare channel 1.
-    ChannelOne,
+    ChannelOneDma,
 
     /// Compare channel 2.
-    ChannelTwo,
+    ChannelTwoDma,
 }
 
 /// Timer channels
@@ -256,11 +256,11 @@ macro_rules! hal {
                             // Enable update event interrupt
                             self.tim.dier.modify(|_, w| w.uie().set_bit());
                         },
-                        Event::ChannelOne => {
-                            self.tim.dier.modify(|_, w | w.cc1ie().set_bit());
+                        Event::ChannelOneDma => {
+                            self.tim.dier.modify(|_, w | w.cc1de().set_bit());
                         },
-                        Event::ChannelTwo => {
-                            self.tim.dier.modify(|_, w | w.cc2ie().set_bit());
+                        Event::ChannelTwoDma => {
+                            self.tim.dier.modify(|_, w | w.cc2de().set_bit());
                         },
                     }
                 }
@@ -297,31 +297,11 @@ macro_rules! hal {
                             // Enable update event interrupt
                             self.tim.dier.modify(|_, w| w.uie().clear_bit());
                         },
-                        Event::ChannelOne => {
-                            self.tim.dier.modify(|_, w | w.cc1ie().clear_bit());
+                        Event::ChannelOneDma => {
+                            self.tim.dier.modify(|_, w | w.cc1de().clear_bit());
                         },
-                        Event::ChannelTwo => {
-                            self.tim.dier.modify(|_, w | w.cc2ie().clear_bit());
-                        },
-                    }
-                }
-
-                pub fn check_event(&self, event: Event) -> bool {
-                    match event {
-                        Event::TimeOut => {
-                            let result = self.tim.sr.read().uif().bit_is_set();
-                            self.tim.sr.modify(|_, w| w.uif().clear_bit());
-                            result
-                        },
-                        Event::ChannelOne => {
-                            let result = self.tim.sr.read().cc1if().bit_is_set();
-                            self.tim.sr.modify(|_, w| w.cc1if().clear_bit());
-                            result
-                        },
-                        Event::ChannelTwo => {
-                            let result = self.tim.sr.read().cc2if().bit_is_set();
-                            self.tim.sr.modify(|_, w| w.cc2if().clear_bit());
-                            result
+                        Event::ChannelTwoDma => {
+                            self.tim.dier.modify(|_, w | w.cc2de().clear_bit());
                         },
                     }
                 }
