@@ -2,7 +2,7 @@
 
 use core::marker::PhantomData;
 
-use crate::rcc::AHB4;
+use crate::rcc::Ccdr;
 
 use crate::stm32::{EXTI, SYSCFG};
 
@@ -12,7 +12,7 @@ pub trait GpioExt {
     type Parts;
 
     /// Splits the GPIO block into independent pins and registers
-    fn split(self, ahb4: &mut AHB4) -> Self::Parts;
+    fn split(self, ahb4: &mut Ccdr) -> Self::Parts;
 }
 
 pub struct Alternate<MODE> {
@@ -111,7 +111,7 @@ macro_rules! gpio {
             use embedded_hal::digital::v2::{InputPin, OutputPin,
                                             StatefulOutputPin, toggleable};
 
-            use crate::rcc::AHB4;
+            use crate::rcc::Ccdr;
             use crate::stm32::$GPIOX;
             use crate::stm32::{EXTI, SYSCFG};
             use super::{
@@ -133,10 +133,10 @@ macro_rules! gpio {
             impl GpioExt for $GPIOX {
                 type Parts = Parts;
 
-                fn split(self, ahb: &mut AHB4) -> Parts {
-                    ahb.enr().modify(|_, w| w.$iopxenr().set_bit());
-                    ahb.rstr().modify(|_, w| w.$iopxrst().set_bit());
-                    ahb.rstr().modify(|_, w| w.$iopxrst().clear_bit());
+                fn split(self, ccdr: &mut Ccdr) -> Parts {
+                    ccdr.ahb4.enr().modify(|_, w| w.$iopxenr().set_bit());
+                    ccdr.ahb4.rstr().modify(|_, w| w.$iopxrst().set_bit());
+                    ccdr.ahb4.rstr().modify(|_, w| w.$iopxrst().clear_bit());
 
                     Parts {
                         $(
