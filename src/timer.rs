@@ -117,8 +117,20 @@ pub enum Event {
     /// Timer timed out / count down ended
     TimeOut,
 
-    /// Timer requests a DMA transaction when timed out.
-    DmaRequest,
+    /// Compare channel 1.
+    ChannelOne,
+
+    /// Compare channel 2.
+    ChannelTwo,
+}
+
+/// Timer channels
+pub enum Channel {
+    /// Channel 1
+    One,
+
+    /// Channel 2
+    Two,
 }
 
 macro_rules! hal {
@@ -244,8 +256,36 @@ macro_rules! hal {
                             // Enable update event interrupt
                             self.tim.dier.modify(|_, w| w.uie().set_bit());
                         },
-                        Event::DmaRequest => {
-                            self.tim.dier.modify(|_, w| w.ude().set_bit());
+                        Event::ChannelOne => {
+                            self.tim.dier.modify(|_, w | w.cc1ie().set_bit());
+                        },
+                        Event::ChannelTwo => {
+                            self.tim.dier.modify(|_, w | w.cc2ie().set_bit());
+                        },
+                    }
+                }
+
+                pub fn configure_channel(&mut self, channel: Channel, fraction: f32) {
+                    let compare = (self.tim.arr.read().bits() as f32 * fraction) as u16;
+
+                    match channel {
+                        Channel::One => {
+                            self.tim.ccr1.write(|w| w.ccr().bits(compare.into()));
+                            self.tim.ccmr1_output_mut().modify(|_, w| unsafe {w
+                                    .cc1s().output()
+                                    .oc1pe().clear_bit()
+                                    .oc1fe().clear_bit()
+                                    .oc1m().bits(0)
+                                    .oc1ce().clear_bit()});
+                        },
+                        Channel::Two => {
+                            self.tim.ccr2.write(|w| w.ccr().bits(compare.into()));
+                            self.tim.ccmr1_output_mut().modify(|_, w| unsafe {w
+                                    .cc2s().output()
+                                    .oc2pe().clear_bit()
+                                    .oc2fe().clear_bit()
+                                    .oc2m().bits(0)
+                                    .oc2ce().clear_bit()});
                         }
                     }
                 }
@@ -257,9 +297,32 @@ macro_rules! hal {
                             // Enable update event interrupt
                             self.tim.dier.modify(|_, w| w.uie().clear_bit());
                         },
-                        Event::DmaRequest => {
-                            self.tim.dier.modify(|_, w| w.ude().clear_bit());
-                        }
+                        Event::ChannelOne => {
+                            self.tim.dier.modify(|_, w | w.cc1ie().clear_bit());
+                        },
+                        Event::ChannelTwo => {
+                            self.tim.dier.modify(|_, w | w.cc2ie().clear_bit());
+                        },
+                    }
+                }
+
+                pub fn check_event(&self, event: Event) -> bool {
+                    match event {
+                        Event::TimeOut => {
+                            let result = self.tim.sr.read().uif().bit_is_set();
+                            self.tim.sr.modify(|_, w| w.uif().clear_bit());
+                            result
+                        },
+                        Event::ChannelOne => {
+                            let result = self.tim.sr.read().cc1if().bit_is_set();
+                            self.tim.sr.modify(|_, w| w.cc1if().clear_bit());
+                            result
+                        },
+                        Event::ChannelTwo => {
+                            let result = self.tim.sr.read().cc2if().bit_is_set();
+                            self.tim.sr.modify(|_, w| w.cc2if().clear_bit());
+                            result
+                        },
                     }
                 }
 
@@ -284,8 +347,8 @@ macro_rules! hal {
 
 hal! {
     // Advanced-control
-    TIM1: (tim1, apb2, tim1en, tim1rst),
-    TIM8: (tim8, apb2, tim8en, tim8rst),
+    //TIM1: (tim1, apb2, tim1en, tim1rst),
+    //TIM8: (tim8, apb2, tim8en, tim8rst),
 
     // General-purpose
     TIM2: (tim2, apb1l, tim2en, tim2rst),
@@ -294,16 +357,16 @@ hal! {
     TIM5: (tim5, apb1l, tim5en, tim5rst),
 
     // Basic
-    TIM6: (tim6, apb1l, tim6en, tim6rst),
-    TIM7: (tim7, apb1l, tim7en, tim7rst),
+    //TIM6: (tim6, apb1l, tim6en, tim6rst),
+    //TIM7: (tim7, apb1l, tim7en, tim7rst),
 
     // General-purpose
-    TIM12: (tim12, apb1l, tim12en, tim12rst),
-    TIM13: (tim13, apb1l, tim13en, tim13rst),
-    TIM14: (tim14, apb1l, tim14en, tim14rst),
+    //TIM12: (tim12, apb1l, tim12en, tim12rst),
+    //TIM13: (tim13, apb1l, tim13en, tim13rst),
+    //TIM14: (tim14, apb1l, tim14en, tim14rst),
 
     // General-purpose
-    TIM15: (tim15, apb2, tim15en, tim15rst),
-    TIM16: (tim16, apb2, tim16en, tim16rst),
-    TIM17: (tim17, apb2, tim17en, tim17rst),
+    //TIM15: (tim15, apb2, tim15en, tim15rst),
+    //TIM16: (tim16, apb2, tim16en, tim16rst),
+    //TIM17: (tim17, apb2, tim17en, tim17rst),
 }
