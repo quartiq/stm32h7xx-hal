@@ -88,6 +88,7 @@ impl Qspi {
         regs.cr.write(|w| unsafe {
             w.prescaler().bits(divisor as u8)
              .fsel().set_bit()
+             .sshift().set_bit()
         });
 
         // Enable ther peripheral
