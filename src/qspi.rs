@@ -214,10 +214,8 @@ impl Qspi {
             }
         }
 
-        // Check that there is no more transaction pending.
-        if self.is_busy() {
-            return Err(QspiError::FifoData);
-        }
+        // Wait for the busy bit to clear.
+        while self.is_busy() {};
 
         // Clear the transfer complete flag.
         self.rb.fcr.modify(|_ ,w| w.ctcf().set_bit());
