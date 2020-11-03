@@ -776,24 +776,3 @@ where
         Ok(r.1)
     }
 }
-
-impl<STREAM, PERIPHERAL, DIR, BUF> Drop
-    for Transfer<STREAM, PERIPHERAL, DIR, BUF>
-where
-    STREAM: Stream,
-    PERIPHERAL: TargetAddress<DIR>,
-    DIR: Direction,
-    BUF: WriteBuffer<Word = <PERIPHERAL as TargetAddress<DIR>>::MemSize>
-        + 'static,
-{
-    fn drop(&mut self) {
-        self.stream.disable();
-
-        // "No re-ordering of reads and writes across this point is allowed"
-        compiler_fence(Ordering::SeqCst);
-
-        // Ensure that the transfer to device memory that disables the stream is
-        // complete before subsequent memory transfers
-        cortex_m::asm::dmb();
-    }
-}
