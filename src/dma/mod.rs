@@ -291,7 +291,7 @@ where
         + 'static,
 {
     stream: STREAM,
-    peripheral: PERIPHERAL,
+    _peripheral: PhantomData<PERIPHERAL>,
     _direction: PhantomData<DIR>,
     buf: Option<BUF>,
     double_buf: Option<BUF>,
@@ -338,7 +338,7 @@ where
     ///   `None`.
     pub fn init(
         mut stream: STREAM,
-        peripheral: PERIPHERAL,
+        peripheral: &PERIPHERAL,
         mut memory: BUF,
         mut double_buf: Option<BUF>,
         config: CONFIG,
@@ -422,7 +422,7 @@ where
 
         let mut transfer = Self {
             stream,
-            peripheral,
+            _peripheral: PhantomData,
             _direction: PhantomData,
             buf: Some(memory),
             double_buf,
@@ -435,9 +435,7 @@ where
 
     /// Starts the transfer, the closure will be executed right after enabling
     /// the stream.
-    pub fn start<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut PERIPHERAL),
+    pub fn start(&mut self)
     {
         // "Preceding reads and writes cannot be moved past subsequent writes"
         compiler_fence(Ordering::Release);
@@ -453,16 +451,12 @@ where
         unsafe {
             self.stream.enable();
         }
-        f(&mut self.peripheral);
     }
 
     /// Pauses the dma stream, the closure will be executed right before
     /// disabling the stream.
-    pub fn pause<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut PERIPHERAL),
+    pub fn pause(&mut self)
     {
-        f(&mut self.peripheral);
         self.stream.disable()
     }
 
@@ -578,7 +572,7 @@ where
     }
 
     /// Stops the stream and returns the underlying resources.
-    pub fn free(mut self) -> (STREAM, PERIPHERAL, BUF, Option<BUF>) {
+    pub fn free(mut self) -> (STREAM, BUF, Option<BUF>) {
         self.stream.disable();
         compiler_fence(Ordering::SeqCst);
 
@@ -590,11 +584,10 @@ where
 
         unsafe {
             let stream = ptr::read(&self.stream);
-            let peripheral = ptr::read(&self.peripheral);
             let buf = ptr::read(&self.buf);
             let double_buf = ptr::read(&self.double_buf);
             mem::forget(self);
-            (stream, peripheral, buf.unwrap(), double_buf)
+            (stream, buf.unwrap(), double_buf)
         }
     }
 
