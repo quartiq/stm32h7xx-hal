@@ -470,34 +470,38 @@ where
     ///   the DMA stream will error (TEIF) and disable itself.
     pub fn next_transfer_with<F, T>(&mut self, func: F) -> Result<T, DMAError>
     where
-        F: FnOnce(BUF, CurrentBuffer) -> (BUF, T),
+        F: FnOnce(BUF, CurrentBuffer, usize) -> (BUF, T),
     {
-        let (single_buffer, inactive) = match STREAM::get_inactive_buffer() {
-            None => {
-                // Single buffer mode
-                self.stream.disable();
-                (true, CurrentBuffer::Buffer0)
-            }
-            Some(inactive) => {
-                // Double buffer mode
-                if !STREAM::get_transfer_complete_flag() {
-                    // DMA has not released a buffer
-                    return Err(DMAError::NotReady);
+        let (single_buffer, inactive, remainder) =
+            match STREAM::get_inactive_buffer() {
+                None => {
+                    // Single buffer mode
+                    self.stream.disable();
+                    // Read the number of data remaining to be transfered.
+                    let remainder = STREAM::get_number_of_transfers() as usize;
+                    (true, CurrentBuffer::Buffer0, remainder)
                 }
-                // Poison the peripheral's inactive memory address to get a memory
-                // error instead of potentially silent corruption.
-                // If DMA wins the race (overrun) to the inactive buffer
-                // between reading the CT bit and poisoning the inactive address, this
-                // write will fail and lead to a transfer error (TEIF) and disable
-                // the stream.
-                // If DMA wins the race by the time we write the new valid address
-                // (below), it gets a bus error and errors/stops.
-                unsafe {
-                    self.stream.set_memory_address(inactive, 0xffff_ffffusize);
+                Some(inactive) => {
+                    // Double buffer mode
+                    if !STREAM::get_transfer_complete_flag() {
+                        // DMA has not released a buffer
+                        return Err(DMAError::NotReady);
+                    }
+                    // Poison the peripheral's inactive memory address to get a memory
+                    // error instead of potentially silent corruption.
+                    // If DMA wins the race (overrun) to the inactive buffer
+                    // between reading the CT bit and poisoning the inactive address, this
+                    // write will fail and lead to a transfer error (TEIF) and disable
+                    // the stream.
+                    // If DMA wins the race by the time we write the new valid address
+                    // (below), it gets a bus error and errors/stops.
+                    unsafe {
+                        self.stream
+                            .set_memory_address(inactive, 0xffff_ffffusize);
+                    }
+                    (false, inactive, 0)
                 }
-                (false, inactive)
-            }
-        };
+            };
 
         // Protect the instruction sequence of preceding DMA disable/inactivity
         // verification/poisoning and subsequent (old completed) buffer content
@@ -510,7 +514,7 @@ where
         // NOTE(panic): We always hold ownership in lieu of the DMA peripheral.
         let buf = self.buf[inactive as usize].take().unwrap();
 
-        let (mut buf, result) = func(buf, inactive);
+        let (mut buf, result) = func(buf, inactive, remainder);
 
         // NOTE(unsafe) We now own this buffer and we won't access it
         // until the end of the DMA transfer.
@@ -569,14 +573,15 @@ where
     pub fn next_transfer(
         &mut self,
         new_buf: BUF,
-    ) -> Result<(BUF, CurrentBuffer), DMAError> {
+    ) -> Result<(BUF, CurrentBuffer, usize), DMAError> {
         let mut buf = new_buf;
-        let current = self.next_transfer_with(|mut old, current| {
-            core::mem::swap(&mut old, &mut buf);
-            (old, current)
-        })?;
+        let (current, remainder) =
+            self.next_transfer_with(|mut old, current, remaining| {
+                core::mem::swap(&mut old, &mut buf);
+                (old, (current, remaining))
+            })?;
         // TODO: return buf on Err
-        Ok((buf, current))
+        Ok((buf, current, remainder))
     }
 
     /// Stops the stream and returns the underlying resources.
