@@ -20,8 +20,7 @@ mod utilities;
 use log::info;
 
 use smoltcp::iface::{
-    Interface, InterfaceBuilder, Neighbor, NeighborCache,
-    Route, Routes,
+    Interface, InterfaceBuilder, Neighbor, NeighborCache, Route, Routes,
 };
 use smoltcp::socket::{SocketSet, SocketSetItem};
 use smoltcp::time::Instant;
