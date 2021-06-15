@@ -20,8 +20,7 @@ mod utilities;
 use log::info;
 
 use smoltcp::iface::{
-    EthernetInterface, EthernetInterfaceBuilder, Neighbor, NeighborCache,
-    Route, Routes,
+    Interface, InterfaceBuilder, Neighbor, NeighborCache, Route, Routes,
 };
 use smoltcp::socket::{SocketSet, SocketSetItem};
 use smoltcp::time::Instant;
@@ -74,7 +73,7 @@ static mut STORE: NetStorageStatic = NetStorageStatic {
 };
 
 pub struct Net<'a> {
-    iface: EthernetInterface<'a, ethernet::EthernetDMA<'a>>,
+    iface: Interface<'a, ethernet::EthernetDMA<'a>>,
     sockets: SocketSet<'a>,
 }
 impl<'a> Net<'a> {
@@ -91,7 +90,7 @@ impl<'a> Net<'a> {
             NeighborCache::new(&mut store.neighbor_cache_storage[..]);
         let routes = Routes::new(&mut store.routes_storage[..]);
 
-        let iface = EthernetInterfaceBuilder::new(ethdev)
+        let iface = InterfaceBuilder::new(ethdev)
             .ethernet_addr(ethernet_addr)
             .neighbor_cache(neighbor_cache)
             .ip_addrs(&mut store.ip_addrs[..])
