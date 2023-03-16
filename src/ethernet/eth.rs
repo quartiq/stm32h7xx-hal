@@ -798,14 +798,9 @@ impl StationManagement for EthernetMAC {
 pub struct TxToken<'a, const TD: usize>(&'a mut TDesRing<TD>);
 
 impl<'a, const TD: usize> phy::TxToken for TxToken<'a, TD> {
-    fn consume<R, F>(
-        self,
-        _timestamp: Instant,
-        len: usize,
-        f: F,
-    ) -> smoltcp::Result<R>
+    fn consume<R, F>(self, len: usize, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> smoltcp::Result<R>,
+        F: FnOnce(&mut [u8]) -> R,
     {
         assert!(len <= ETH_BUF_SIZE);
 
@@ -819,9 +814,9 @@ impl<'a, const TD: usize> phy::TxToken for TxToken<'a, TD> {
 pub struct RxToken<'a, const RD: usize>(&'a mut RDesRing<RD>);
 
 impl<'a, const RD: usize> phy::RxToken for RxToken<'a, RD> {
-    fn consume<R, F>(self, _timestamp: Instant, f: F) -> smoltcp::Result<R>
+    fn consume<R, F>(self, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> smoltcp::Result<R>,
+        F: FnOnce(&mut [u8]) -> R,
     {
         let result = f(unsafe { self.0.buf_as_slice_mut() });
         self.0.release();
@@ -830,11 +825,11 @@ impl<'a, const RD: usize> phy::RxToken for RxToken<'a, RD> {
 }
 
 /// Implement the smoltcp Device interface
-impl<'a, const TD: usize, const RD: usize> phy::Device<'a>
-    for EthernetDMA<'_, TD, RD>
+impl<'a, const TD: usize, const RD: usize> phy::Device
+    for EthernetDMA<'a, TD, RD>
 {
-    type RxToken = RxToken<'a, RD>;
-    type TxToken = TxToken<'a, TD>;
+    type RxToken<'b> = RxToken<'b, RD> where Self: 'b;
+    type TxToken<'b> = TxToken<'b, TD> where Self :'b;
 
     // Clippy false positive because DeviceCapabilities is non-exhaustive
     #[allow(clippy::field_reassign_with_default)]
@@ -847,7 +842,10 @@ impl<'a, const TD: usize, const RD: usize> phy::Device<'a>
         caps
     }
 
-    fn receive(&mut self) -> Option<(RxToken<RD>, TxToken<TD>)> {
+    fn receive(
+        &mut self,
+        _timestamp: Instant,
+    ) -> Option<(RxToken<'_, RD>, TxToken<'_, TD>)> {
         // Skip all queued packets with errors.
         while self.ring.rx.available() && !self.ring.rx.valid() {
             self.ring.rx.release()
@@ -860,7 +858,7 @@ impl<'a, const TD: usize, const RD: usize> phy::Device<'a>
         }
     }
 
-    fn transmit(&mut self) -> Option<TxToken<TD>> {
+    fn transmit(&mut self, _timestamp: Instant) -> Option<TxToken<'_, TD>> {
         if self.ring.tx.available() {
             Some(TxToken(&mut self.ring.tx))
         } else {

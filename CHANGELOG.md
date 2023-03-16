@@ -4,6 +4,7 @@
 * Alternate pins are readable. [#409]
 * MSRV increased to 1.62.0
 * **Breaking** Bump `embedded-sdmmc` to 0.4
+* **Breaking** Updated smoltcp version to 0.9
 
 ## [v0.13.1] 2022-11-06
 
